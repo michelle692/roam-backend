@@ -9,6 +9,11 @@ from flask_cors import CORS
 
 # Database.
 from pymongo import MongoClient
+from bson.objectid import ObjectId
+from bson import json_util
+
+def parse_json(data):
+    return json.loads(json_util.dumps(data))
 
 # Google API.
 GOOGLE_MAPS_KEY = 'key=' + os.environ['MAPS_KEY']
@@ -108,3 +113,102 @@ def login():
     }
 
     return output
+
+@app.route('/history/add')
+def add():
+    args = request.args
+    if 'user_id' not in args or 'city' not in args or 'place_id' not in args or 'notes' not in args or 'country' not in args or 'date' not in args or 'lat' not in args or 'lng' not in args:
+        return {'error': 'missing args.'}
+
+    user_id = ObjectId(args.get('user_id'))
+
+    matches = list(users.find({ "_id": user_id }))
+    if len(matches) == 0:
+        return {'error': 'user_id does not exist.'}
+    
+    city = args.get('city')
+    place_id = args.get('place_id')
+    notes = args.get('notes')
+    country = args.get('country')
+    date = args.get('date')
+    lat = args.get('lat')
+    lng = args.get('lng')
+
+    data = {
+        'user_id': user_id,
+        'city': city,
+        'place_id': place_id,
+        'notes': notes,
+        'country': country,
+        'date': date,
+        'lat': lat,
+        'lng': lng
+    }
+
+    # Insert the data into the users table.
+    result = history.insert_one(data)
+
+    # Return this user back to the requester.
+    return parse_json(data)
+
+@app.route('/history/get')
+def get():
+    args = request.args
+    if 'user_id' not in args:
+        return {'error': 'missing args.'}
+    user_id = ObjectId(args.get('user_id'))
+
+    usermatch = list(users.find({ "_id": user_id }))
+    if len(usermatch) == 0:
+        return {'error': 'user_id does not exist.'}
+    
+    matches = list(history.find({'user_id': user_id}))
+    return parse_json(matches)
+
+@app.route('/history/edit')
+def edit():
+    args = request.args
+    if 'history_id' not in args:
+        return {'error': 'missing args.'}
+    
+    history_id = ObjectId(args.get('history_id'))
+
+    match = history.find_one({ "_id": history_id })
+
+    if match is None:
+        return {'error': 'history_id does not exist.'}
+
+    if 'city' in args:
+        match['city'] = args.get('city')
+    if 'place_id' in args:
+        match['place_id'] = args.get('place_id')
+    if 'notes' in args:
+        match['notes'] = args.get('notes')
+    if 'country' in args:
+        match['country'] = args.get('country')
+    if 'date' in args:
+        match['date'] = args.get('date')
+    if 'lat' in args:
+        match['lat'] = args.get('lat')
+    if 'lng' in args:
+        match['lng'] = args.get('lng')
+
+    history.replace_one({'_id':history_id}, match)
+    return parse_json(match)
+
+@app.route('/history/remove')
+def remove():
+    args = request.args
+    if 'history_id' not in args:
+        return {'error': 'missing args.'}
+    
+    history_id = ObjectId(args.get('history_id'))
+
+    match = history.find_one({ "_id": history_id })
+
+    if match is None:
+        return {'error': 'history_id does not exist.'}
+    
+    history.delete_one({'_id':history_id})
+    return parse_json(match)
+    
