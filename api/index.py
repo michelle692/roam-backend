@@ -37,6 +37,7 @@ def hash_password(password):
     # Should hash the password here.
     return password
 
+# Search the google maps API and returns city predictions.
 @app.route('/search')
 def search():
     text = request.args.get("text")
@@ -46,6 +47,7 @@ def search():
 
     return json.loads(requests.get(PLACES_API_URL + '&input=' + text).content)
 
+# Retrieve the information from the given location id.
 @app.route('/info')
 def info():
     place_id = request.args.get('place_id')
@@ -55,6 +57,10 @@ def info():
 
     return json.loads(requests.get(GEOCODING_API_URL + '&place_id=' + place_id).content)
 
+
+######################################################################################################
+
+# Add a new username, password, and name to the database.
 @app.route('/create')
 def create():
     args = request.args
@@ -87,6 +93,7 @@ def create():
     # Return this user back to the requester.
     return parse_json(data)
 
+# Identify the matching account entered.
 @app.route('/login')
 def login():
     args = request.args
