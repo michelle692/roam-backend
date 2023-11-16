@@ -31,7 +31,7 @@ roam = mongo['roam']
 
 # Access the db tables.
 users = roam['users']
-history = roam['history']
+histories = roam['histories']
 
 def hash_password(password):
     # Should hash the password here.
@@ -81,11 +81,11 @@ def create():
     result = users.insert_one(data)
 
     # Append unique user id into data and remove password.
-    data['_id'] = str(result.inserted_id)
+    data['_id'] = result.inserted_id
     data.pop('password')
 
     # Return this user back to the requester.
-    return data
+    return parse_json(data)
 
 @app.route('/login')
 def login():
@@ -107,14 +107,14 @@ def login():
 
     # Clean out the account object into a returnable account.
     output = {
-        '_id': str(account['_id']),
+        '_id': account['_id'],
         'username': account['username'],
         'name': account['name']
     }
 
-    return output
+    return parse_json(output)
 
-@app.route('/history/add')
+@app.route('/histories/add')
 def add():
     args = request.args
     if 'user_id' not in args or 'city' not in args or 'place_id' not in args or 'notes' not in args or 'country' not in args or 'date' not in args or 'lat' not in args or 'lng' not in args:
@@ -146,12 +146,15 @@ def add():
     }
 
     # Insert the data into the users table.
-    result = history.insert_one(data)
+    result = histories.insert_one(data)
+
+    # Append unique history id into data.
+    data['_id'] = result.inserted_id
 
     # Return this user back to the requester.
     return parse_json(data)
 
-@app.route('/history/get')
+@app.route('/histories/get')
 def get():
     args = request.args
     if 'user_id' not in args:
@@ -162,10 +165,10 @@ def get():
     if len(usermatch) == 0:
         return {'error': 'user_id does not exist.'}
     
-    matches = list(history.find({'user_id': user_id}))
+    matches = list(histories.find({'user_id': user_id}))
     return parse_json(matches)
 
-@app.route('/history/edit')
+@app.route('/histories/edit')
 def edit():
     args = request.args
     if 'history_id' not in args:
@@ -173,30 +176,20 @@ def edit():
     
     history_id = ObjectId(args.get('history_id'))
 
-    match = history.find_one({ "_id": history_id })
+    history = histories.find_one({ "_id": history_id })
 
-    if match is None:
+    if history is None:
         return {'error': 'history_id does not exist.'}
-
-    if 'city' in args:
-        match['city'] = args.get('city')
-    if 'place_id' in args:
-        match['place_id'] = args.get('place_id')
+    
     if 'notes' in args:
-        match['notes'] = args.get('notes')
-    if 'country' in args:
-        match['country'] = args.get('country')
+        history['notes'] = args.get('notes')
     if 'date' in args:
-        match['date'] = args.get('date')
-    if 'lat' in args:
-        match['lat'] = args.get('lat')
-    if 'lng' in args:
-        match['lng'] = args.get('lng')
+        history['date'] = args.get('date')
 
-    history.replace_one({'_id':history_id}, match)
-    return parse_json(match)
+    histories.replace_one({'_id':history_id}, history)
+    return parse_json(history)
 
-@app.route('/history/remove')
+@app.route('/histories/remove')
 def remove():
     args = request.args
     if 'history_id' not in args:
@@ -204,11 +197,11 @@ def remove():
     
     history_id = ObjectId(args.get('history_id'))
 
-    match = history.find_one({ "_id": history_id })
+    history = histories.find_one({ "_id": history_id })
 
-    if match is None:
+    if history is None:
         return {'error': 'history_id does not exist.'}
     
-    history.delete_one({'_id':history_id})
-    return parse_json(match)
+    histories.delete_one({'_id':history_id})
+    return parse_json(history)
     
