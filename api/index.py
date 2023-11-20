@@ -32,6 +32,7 @@ roam = mongo['roam']
 # Access the db tables.
 users = roam['users']
 histories = roam['histories']
+counters = roam['counters']
 
 def hash_password(password):
     # Should hash the password here.
@@ -90,8 +91,21 @@ def create():
     data['_id'] = result.inserted_id
     data.pop('password')
 
+    count_data = {
+        'user_id': data['_id'],
+        'history': {
+            'cities': 0,
+            'states': 0,
+            'countries': 0,
+            'continents': 0
+        }
+    }
+
+    res = counters.insert_one(count_data)
+
     # Return this user back to the requester.
-    return parse_json(data)
+    # return parse_json(data)
+    return parse_json({**data, **count_data})
 
 # Identify the matching account entered.
 @app.route('/login')
