@@ -32,6 +32,7 @@ roam = mongo['roam']
 # Access the db tables.
 users = roam['users']
 histories = roam['histories']
+wishlists = roam['wishlists']
 counters = roam['counters']
 
 def hash_password(password):
@@ -225,4 +226,96 @@ def remove():
     
     histories.delete_one({'_id':history_id})
     return parse_json(history)
+
+#Wishlist functionality    
+
+@app.route('/wishlists/add')
+def add2():
+    args = request.args
+    if 'user_id' not in args or 'city' not in args or 'place_id' not in args or 'notes' not in args or 'country' not in args or 'date' not in args or 'lat' not in args or 'lng' not in args:
+        return {'error': 'missing args.'}
+
+    user_id = ObjectId(args.get('user_id'))
+
+    matches = list(users.find({ "_id": user_id }))
+    if len(matches) == 0:
+        return {'error': 'user_id does not exist.'}
     
+    city = args.get('city')
+    place_id = args.get('place_id')
+    notes = args.get('notes')
+    country = args.get('country')
+    date = args.get('date')
+    lat = args.get('lat')
+    lng = args.get('lng')
+
+    data = {
+        'user_id': user_id,
+        'city': city,
+        'place_id': place_id,
+        'notes': notes,
+        'country': country,
+        'date': date,
+        'lat': lat,
+        'lng': lng
+    }
+
+    # Insert the data into the users table.
+    result = wishlists.insert_one(data)
+
+    # Append unique history id into data.
+    data['_id'] = result.inserted_id
+
+    # Return this user back to the requester.
+    return parse_json(data)
+
+@app.route('/wishlists/get')
+def get2():
+    args = request.args
+    if 'user_id' not in args:
+        return {'error': 'missing args.'}
+    user_id = ObjectId(args.get('user_id'))
+
+    usermatch = list(users.find({ "_id": user_id }))
+    if len(usermatch) == 0:
+        return {'error': 'user_id does not exist.'}
+    
+    matches = list(wishlists.find({'user_id': user_id}))
+    return parse_json(matches)
+
+@app.route('/wishlists/edit')
+def edit2():
+    args = request.args
+    if 'history_id' not in args:
+        return {'error': 'missing args.'}
+    
+    history_id = ObjectId(args.get('history_id'))
+
+    history = wishlists.find_one({ "_id": history_id })
+
+    if history is None:
+        return {'error': 'history_id does not exist.'}
+    
+    if 'notes' in args:
+        history['notes'] = args.get('notes')
+    if 'date' in args:
+        history['date'] = args.get('date')
+
+    wishlists.replace_one({'_id':history_id}, history)
+    return parse_json(history)
+
+@app.route('/wishlists/remove')
+def remove2():
+    args = request.args
+    if 'history_id' not in args:
+        return {'error': 'missing args.'}
+    
+    history_id = ObjectId(args.get('history_id'))
+
+    history = wishlists.find_one({ "_id": history_id })
+
+    if history is None:
+        return {'error': 'history_id does not exist.'}
+    
+    wishlists.delete_one({'_id':history_id})
+    return parse_json(history)
