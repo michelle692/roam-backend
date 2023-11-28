@@ -8,7 +8,7 @@ from flask import Flask, request
 from flask_cors import CORS
 
 # Database.
-from pymongo import MongoClient
+from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
 from bson import json_util
 
@@ -34,6 +34,7 @@ users = roam['users']
 histories = roam['histories']
 wishlists = roam['wishlists']
 counters = roam['counters']
+ranks = roam['ranks']
 
 def hash_password(password):
     # Should hash the password here.
@@ -139,7 +140,7 @@ def login():
 @app.route('/histories/add')
 def add():
     args = request.args
-    if 'user_id' not in args or 'city' not in args or 'place_id' not in args or 'notes' not in args or 'country' not in args or 'date' not in args or 'lat' not in args or 'lng' not in args:
+    if 'user_id' not in args or 'city' not in args or 'place_id' not in args or 'notes' not in args or 'country' not in args or 'date' not in args or 'lat' not in args or 'lng' not in args or 'usstate' not in args:
         return {'error': 'missing args.'}
 
     user_id = ObjectId(args.get('user_id'))
@@ -148,13 +149,24 @@ def add():
     if len(matches) == 0:
         return {'error': 'user_id does not exist.'}
     
+    place_id = args.get('place_id')  
+
+    history_search = {
+        "place_id": place_id, 
+        "user_id": user_id
+    }
+    locationmatch = list(histories.find(history_search))
+    if len(locationmatch) > 0:
+        return {'error': 'location already added.'}
+    
     city = args.get('city')
-    place_id = args.get('place_id')
     notes = args.get('notes')
     country = args.get('country')
+    usstate = args.get('usstate')
     date = args.get('date')
     lat = args.get('lat')
     lng = args.get('lng')
+
 
     data = {
         'user_id': user_id,
@@ -162,19 +174,47 @@ def add():
         'place_id': place_id,
         'notes': notes,
         'country': country,
+        'usstate': usstate,
         'date': date,
         'lat': lat,
         'lng': lng
     }
 
-    # Insert the data into the users table.
+    # Insert the data into the histories table.
     result = histories.insert_one(data)
+
+    increment_rank(place_id=place_id, city=city, country=country)
 
     # Append unique history id into data.
     data['_id'] = result.inserted_id
 
     # Return this user back to the requester.
     return parse_json(data)
+
+
+def increment_rank(place_id, city, country):
+    matches = list(ranks.find({'place_id': place_id}))
+
+    # If the location already exists, increment the counter
+    if len(matches) > 0:
+        ranks.update_one({'place_id': place_id}, {'$inc': {'counter': 1}})
+
+    # Otherwise, insert new data
+    else:
+        data = {
+            'place_id': place_id,
+            'city': city,
+            'country': country,
+            'counter': 1
+        }
+        rank = ranks.insert_one(data)
+    
+
+@app.route('/ranks/get')
+def get_ranks():
+    top_documents = ranks.find().sort("count", DESCENDING).limit(5)
+    return parse_json(top_documents)
+
 
 @app.route('/histories/get')
 def get():
@@ -232,7 +272,7 @@ def remove():
 @app.route('/wishlists/add')
 def add2():
     args = request.args
-    if 'user_id' not in args or 'city' not in args or 'place_id' not in args or 'notes' not in args or 'country' not in args or 'date' not in args or 'lat' not in args or 'lng' not in args:
+    if 'user_id' not in args or 'city' not in args or 'place_id' not in args or 'notes' not in args or 'country' not in args or 'date' not in args or 'lat' not in args or 'lng' not in args or 'usstate' not in args:
         return {'error': 'missing args.'}
 
     user_id = ObjectId(args.get('user_id'))
@@ -245,6 +285,7 @@ def add2():
     place_id = args.get('place_id')
     notes = args.get('notes')
     country = args.get('country')
+    usstate = args.get('usstate')
     date = args.get('date')
     lat = args.get('lat')
     lng = args.get('lng')
@@ -255,18 +296,19 @@ def add2():
         'place_id': place_id,
         'notes': notes,
         'country': country,
+        'usstate': usstate,
         'date': date,
         'lat': lat,
         'lng': lng
     }
 
-    # Insert the data into the users table.
+    # Insert the data into the wishlists table.
     result = wishlists.insert_one(data)
 
-    # Append unique history id into data.
+    # Append unique wishlist id into data.
     data['_id'] = result.inserted_id
 
-    # Return this user back to the requester.
+    # Return this wishlist back to the requester.
     return parse_json(data)
 
 @app.route('/wishlists/get')
@@ -319,3 +361,4 @@ def remove2():
     
     wishlists.delete_one({'_id':history_id})
     return parse_json(history)
+
