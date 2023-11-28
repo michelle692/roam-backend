@@ -2,6 +2,7 @@
 import requests
 import json
 import os
+import bcrypt
 
 # Backend server.
 from flask import Flask, request
@@ -37,8 +38,8 @@ counters = roam['counters']
 ranks = roam['ranks']
 
 def hash_password(password):
-    # Should hash the password here.
-    return password
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed_password.decode('utf-8')
 
 # Search the google maps API and returns city predictions.
 @app.route('/search')
@@ -125,7 +126,7 @@ def login():
     account = matches[0]
 
     # Verify the passwords are the same.
-    if hash_password(args.get('password')) != account['password']:
+    if not bcrypt.checkpw(args.get('password').encode('utf-8'), account['password'].encode('utf-8')):
         return {'error': 'password is incorrect.'}
 
     # Clean out the account object into a returnable account.
@@ -212,8 +213,8 @@ def increment_rank(place_id, city, country):
 
 @app.route('/ranks/get')
 def get_ranks():
-    top_documents = ranks.find().sort("count", DESCENDING).limit(5)
-    return parse_json(top_documents)
+    top_documents = ranks.find().sort("counter", DESCENDING).limit(5)
+    return parse_json(list(top_documents))
 
 
 @app.route('/histories/get')
